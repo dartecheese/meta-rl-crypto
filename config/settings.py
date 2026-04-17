@@ -10,12 +10,11 @@ from typing import Optional
 @dataclass
 class LLMConfig:
     """LLM configuration for Actor/Judge/Meta-Judge roles."""
-    model: str = "meta-llama/Llama-3.1-8B-Instruct"  # or any OpenAI-compatible endpoint
-    api_base: str = "http://localhost:8000/v1"  # vLLM / Ollama / etc.
-    api_key: str = "not-needed"  # set via env var LLM_API_KEY
+    model: str = "gemini-2.0-flash"  # set via env var or override
+    api_key: str = ""  # set via env var GEMINI_API_KEY
     temperature: float = 0.7
-    top_p: float = 0.9  # nucleus sampling
-    num_candidates: int = 5  # K candidate responses per step
+    top_p: float = 0.9
+    num_candidates: int = 5    # K candidate responses per step
     max_tokens: int = 1024
 
 

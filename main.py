@@ -46,10 +46,8 @@ def load_config(config_path: str | None = None) -> Config:
     config = Config()
 
     # Override from env vars
-    if os.getenv("LLM_API_BASE"):
-        config.llm.api_base = os.getenv("LLM_API_BASE")
-    if os.getenv("LLM_API_KEY"):
-        config.llm.api_key = os.getenv("LLM_API_KEY")
+    if os.getenv("GEMINI_API_KEY"):
+        config.llm.api_key = os.getenv("GEMINI_API_KEY")
     if os.getenv("LLM_MODEL"):
         config.llm.model = os.getenv("LLM_MODEL")
     if os.getenv("CMC_API_KEY"):
