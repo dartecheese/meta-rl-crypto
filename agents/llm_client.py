@@ -5,6 +5,7 @@ Works with vLLM, Ollama, OpenAI, Anthropic-compatible endpoints, etc.
 
 import os
 import logging
+import time
 from dataclasses import dataclass
 
 import requests
@@ -51,18 +52,32 @@ class LLMClient:
             "n": n,
         }
 
-        try:
-            resp = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=120,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:
-            logger.error("LLM request failed: %s", e)
-            raise
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                resp = requests.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=120,
+                )
+                if resp.status_code == 429:
+                    wait = min(2 ** attempt * 2, 30)
+                    logger.warning("Rate limited, retrying in %ds (attempt %d/%d)", wait, attempt + 1, max_retries)
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                break
+            except requests.exceptions.HTTPError:
+                raise
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.error("LLM request failed: %s", e)
+                    raise
+                time.sleep(2 ** attempt)
+        else:
+            raise RuntimeError("Max retries exceeded due to rate limiting")
 
         responses = []
         for choice in data.get("choices", []):
@@ -76,12 +91,13 @@ class LLMClient:
     def generate_candidates(self, messages: list[dict], k: int | None = None) -> list[LLMResponse]:
         """Generate K candidate responses using nucleus sampling."""
         k = k or self.config.num_candidates
-        # Some APIs don't support n>1, so fall back to sequential
-        try:
-            return self.chat(messages, n=k)
-        except Exception:
-            logger.info("Falling back to sequential candidate generation")
-            results = []
-            for _ in range(k):
+        # Many APIs (Gemini, etc.) don't support n>1, so always do sequential
+        results = []
+        for i in range(k):
+            if i > 0:
+                time.sleep(1)  # rate limit spacing
+            try:
                 results.extend(self.chat(messages, n=1))
-            return results
+            except Exception as e:
+                logger.warning("Candidate %d/%d failed: %s", i + 1, k, e)
+        return results
